@@ -166,10 +166,6 @@ pytest tests/ -v
 | Phase | Duration | Status |
 |-------|----------|--------|
 | Week 1: Architecture & Core Modules | 5.14 - 5.20 | ✅ Completed |
-| Week 2: Training & API | 5.21 - 5.27 | 📅 Planned |
-| Week 3: Visualization & Integration | 5.28 - 6.03 | 📅 Planned |
-| Week 4: Optimization & Docs | 6.04 - 6.10 | 📅 Planned |
-| Testing & Acceptance | 6.11 - 6.17 | 📅 Planned |
 
 ## AI-Assisted Programming
 
