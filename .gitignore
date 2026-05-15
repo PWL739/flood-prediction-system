@@ -27,3 +27,7 @@ logs/
 
 # Reports
 *.docx
+
+# Claude Code
+.claude/
+.proxy_bridge.py
