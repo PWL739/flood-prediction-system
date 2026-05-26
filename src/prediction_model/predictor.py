@@ -66,8 +66,8 @@ class FloodPredictor:
 
         return {
             "predict_time": datetime.now().isoformat(),
-            "station_name": recent_data["location_id"].iloc[0] if "location_id" in recent_data.columns else location_id,
-            "location_id": location_id,
+            "station_name": recent_data["location_id"].iloc[0] if "location_id" in recent_data.columns else "unknown",
+            "location_id": recent_data["location_id"].iloc[0] if "location_id" in recent_data.columns else "unknown",
             "max_predicted_water_level": round(max_predicted_level, 2),
             "hourly_predictions": [
                 {"hour": i + 1, "level": round(float(l), 2)}
