@@ -43,8 +43,8 @@ class FloodPredictor:
         if len(recent_data) < seq_length:
             return {"error": f"数据不足，需要至少{seq_length}条记录"}
 
-        # 提取特征
-        feature_cols = ["water_level", "flow_rate", "rainfall", "temperature"]
+        # 提取特征（7个特征对应MODEL_CONFIG["input_size"]=7）
+        feature_cols = ["water_level", "flow_rate", "rainfall", "temperature", "ph", "turbidity", "dissolved_oxygen"]
         features = recent_data[feature_cols].values[-seq_length:]
 
         # 归一化
@@ -66,7 +66,8 @@ class FloodPredictor:
 
         return {
             "predict_time": datetime.now().isoformat(),
-            "location_id": recent_data.get("location_id", "unknown"),
+            "station_name": recent_data["location_id"].iloc[0] if "location_id" in recent_data.columns else location_id,
+            "location_id": location_id,
             "max_predicted_water_level": round(max_predicted_level, 2),
             "hourly_predictions": [
                 {"hour": i + 1, "level": round(float(l), 2)}

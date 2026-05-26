@@ -53,7 +53,7 @@ async def get_flood_risk(location_id: str = Query(..., description="站点ID")):
     if not raw_data:
         raise HTTPException(status_code=404, detail="站点不存在或无数据")
 
-    # 构造示例时序数据进行预测
+    # 构造示例时序数据进行预测（7个特征对应MODEL_CONFIG["input_size"]=7）
     dates = pd.date_range(end=datetime.now(), periods=72, freq="h")
     sample_data = pd.DataFrame({
         "location_id": location_id,
@@ -62,6 +62,9 @@ async def get_flood_risk(location_id: str = Query(..., description="站点ID")):
         "flow_rate": np.random.uniform(100, 500, 72),
         "rainfall": np.random.uniform(0, 30, 72),
         "temperature": np.random.uniform(15, 35, 72),
+        "ph": np.random.uniform(6.5, 7.5, 72),
+        "turbidity": np.random.uniform(10, 20, 72),
+        "dissolved_oxygen": np.random.uniform(6, 10, 72),
     })
 
     result = predictor.predict_flood_risk(sample_data)
