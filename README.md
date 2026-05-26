@@ -1,6 +1,6 @@
 # 基于 LSTM-Attention 的洪水预测与预警系统 Flood Prediction & Early Warning System
 
-利用 BiLSTM + Attention 机制，基于 5 个监测站点过去 72 小时水文数据，预测未来 24 小时水位变化，并实现四级洪水预警与状态机管理。
+利用 BiLSTM + Attention 机制，基于 5 个监测站点过去 72 小时水文数据，预测未来 24 小时水位变化，并实现四级洪水预警与状态机管理。**Week 3 新增：注意力热力图、FastAPI+Streamlit 全接口对接、预警统计看板。**
 
 ## 组别 Team
 
@@ -50,10 +50,10 @@ flood-prediction-system/
 │   │   └── data_ingestion.py         #   数据入库管道
 │   ├── web/                          # Web API 模块
 │   │   ├── app.py                    #   FastAPI 应用入口
-│   │   ├── routes.py                 #   API 路由（18个端点）
+│   │   ├── routes.py                 #   API 路由（21个端点）
 │   │   └── schemas.py                #   Pydantic 数据模型
 │   └── visualization/                # 可视化模块
-│       └── app.py                    #   Streamlit 仪表盘（7个页面）
+│       └── app.py                    #   Streamlit 仪表盘（7页面，含注意力热力图）
 ├── scripts/
 │   ├── run_pipeline.py               # 端到端流程演示
 │   ├── train_model.py                # 模型训练脚本（5站点 × 30天 × 24h）
@@ -143,7 +143,7 @@ flood-prediction-system/
 
 ### 6. Web API
 
-FastAPI 提供 18 个 RESTful 端点，统一 JSON 响应格式：
+FastAPI 提供 21 个 RESTful 端点，统一 JSON 响应格式 `{"code": 200, "message": "success", "data": ...}`：
 
 **站点管理**: `GET /api/v1/stations`
 
@@ -153,7 +153,7 @@ FastAPI 提供 18 个 RESTful 端点，统一 JSON 响应格式：
 
 **批量处理**: `GET /api/v1/data-stats` | `POST /api/v1/data/process-batch`
 
-**预测**: `GET /api/v1/prediction/flood-risk` | `GET /api/v1/prediction/all-stations`
+**预测**: `GET /api/v1/prediction/flood-risk` | `GET /api/v1/prediction/all-stations` | `GET /api/v1/prediction/attention-heatmap` (Week 3 新增)
 
 **预警管理**: `POST /api/v1/warnings` | `GET /api/v1/warnings/active` | `GET /api/v1/warning/list`
 
@@ -161,7 +161,19 @@ FastAPI 提供 18 个 RESTful 端点，统一 JSON 响应格式：
 
 ### 7. Streamlit 可视化仪表盘
 
-启动后访问 `http://localhost:8501`，提供 7 个功能页面：监测总览、实时数据、历史分析、预测图表、预警管理、模型性能、系统日志。
+启动后访问 `http://localhost:8501`，提供 7 个功能页面：
+
+| 页面 | 功能 | Week |
+|------|------|------|
+| 🏠 系统概览 | 核心指标卡片、系统工作流程、站点列表、预警等级体系 | W1 |
+| 📡 实时监测 | 5站点实时概览卡片、水位对比图、降雨量对比图、单站点详情仪表盘 | W1+W3 |
+| 📊 数据分析 | 历史趋势图（API对接）、数据验证演示、批量处理工具 | W1+W3 |
+| 🔮 预测分析 | LSTM-Attention 预测、24h水位柱状图、风险等级判定、API在线/离线切换 | W1+W3 |
+| 🔥 注意力热力图 | **72h历史注意力权重分布 + 72×24热力图矩阵 + 预测关联分析** | W3 新增 |
+| ⚠️ 预警管理 | **统计看板（按状态+等级双维度饼图）**、预警列表、创建预警、状态机操作 | W2+W3 |
+| 🤖 模型管理 | 训练结果汇总、Loss对比图、模型架构配置 | W2 |
+
+支持 **FastAPI 在线模式**（自动检测 `http://localhost:8000`）和**离线模拟模式**自动切换。
 
 ## 快速开始 Quick Start
 
@@ -209,6 +221,7 @@ pytest tests/ -v
 |------|------|------|------|
 | Week 1 | 5.14 - 5.20 | 架构设计 + 传感器模拟 + 数据校验 + LSTM-Attention 模型 + API 基础 | ✅ 已完成 |
 | Week 2 | 5.21 - 5.27 | 数据预处理增强 + 时序存储优化 + API 增强 + 批量处理 + 模型训练脚本 + 数据库表补全 + 预警状态机 + Streamlit 仪表盘 | ✅ 已完成 |
+| Week 3 | 5.25 - 5.31 | 注意力热力图 (72h×24h) + FastAPI+Streamlit 全接口对接 + 预警统计看板（双维度饼图）+ 5站点多面板对比图 | ✅ 已完成 |
 
 ## AI 辅助编程 AI-Assisted Programming
 
