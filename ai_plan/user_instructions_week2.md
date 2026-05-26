@@ -48,18 +48,16 @@
 ### [指令1] 读取进度报告与需求理解
 
 ```
-用户: "第三组_洪水预测与预警系统_功能开发和项目进度报告.docx，
-       你读这个进度报告，现在是第二周，按照我们的要求，修改代码"
-
-用户: "flood-prediction-system\"基于LSTM-Attention的洪水预测与预警系统"
-       功能开发和项目进程报告(2).docx，搞错了，要读的是这个报告，
-       你再根据这个报告里的第二周要求修改优化代码"
+用户: "读取项目进度报告"基于LSTM-Attention的洪水预测与预警系统"
+       功能开发和项目进程报告(2).docx，当前为第2周开发阶段，
+       根据报告中第2周的规划任务和交付要求，对现有代码进行修改和优化。"
 
 AI 操作:
-  1. 读取两份进度报告.docx，提取第2周任务要求
+  1. 读取项目进程报告.docx，提取第2周全部任务要求与交付物清单
   2. 分析第1周已完成模块：数据采集、数据处理、LSTM-Attention模型、
      预警服务、Web API、数据库基础
-  3. 确定第2周核心目标：模型训练完善、数据库补全、预警持久化、Pipeline串联
+  3. 对照报告中未完成项(❌/⚠️标记)，确定第2周核心目标：
+     模型训练完善、数据库补全、预警持久化、Pipeline串联
 ```
 
 ### [指令2] 模型训练完善
@@ -144,29 +142,31 @@ AI 实施:
   4. 预测结果包含：风险等级、预测水位序列(24h)、模型版本号
 ```
 
-### [指令7] Streamlit Dashboard与GitHub上传
+### [指令7] Streamlit Dashboard部署与版本发布
 
 ```
-用户: "现在相比之前有什么修改？我要怎么把他上传到我们小组的github仓库里？
-       完成好直接给我运行界面，我确认一下，确认完成再传到我的仓库"
+用户: "汇总当前第2周所有代码修改内容，运行Streamlit Dashboard进行功能验证，
+       确认无误后将全部变更提交并推送至小组GitHub仓库
+       (https://github.com/PWL739/flood-prediction-system)。"
 
 AI 实施:
-  1. 汇总第2周所有修改内容并向用户汇报
-  2. 运行Streamlit Dashboard(端口8501)供用户确认
+  1. 汇总第2周所有修改内容(模型训练、数据库补全、预警状态机、API完善)并向用户汇报
+  2. 启动Streamlit Dashboard(端口8501)，验证各页面功能正常
   3. git add → git commit → git push 到 origin main
-  4. 远程仓库：https://github.com/PWL739/flood-prediction-system
+  4. 推送至远程仓库：https://github.com/PWL739/flood-prediction-system
 ```
 
-### [指令8] 指令文档整理与归档
+### [指令8] AI指令文档归档
 
 ```
-用户: "把我文档里要你操作的内容默认成我跟你对话的指令，
-       你整理一份指令文档，以我的身份，上传到ai_plan"
+用户: "将进度报告中第2周的所有任务要求整理为AI交互指令记录，
+       按照ai_instructions.md的格式统一编写，归档至ai_plan/目录下，
+       作为AI辅助编程的文档留存。"
 
 AI 实施:
-  1. 读取"基于LSTM-Attention的洪水预测与预警系统"功能开发和项目进程报告(2).docx
-  2. 提取报告中第2周所有任务要求
-  3. 按照ai_instructions.md格式编写第2周AI指令记录
+  1. 读取项目进程报告(2).docx，提取第2周全部任务要求
+  2. 对照实际git提交记录，还原每条指令对应的AI操作内容
+  3. 按照ai_instructions.md格式编写第2周AI指令记录文档
   4. 创建 ai_plan/user_instructions_week2.md
   5. git add → git commit → git push 到 origin main
 ```
