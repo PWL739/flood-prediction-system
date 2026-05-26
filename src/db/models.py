@@ -94,18 +94,25 @@ class FloodPredictionRecord(Base):
 
 
 class WarningInfo(Base):
-    """预警信息表"""
+    """预警信息表 —— warning_event，支持状态机: 发布→确认→处理→解除"""
     __tablename__ = "warning_info"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     warning_type = Column(SmallInteger, nullable=False, comment="预警类型: 1-洪水, 2-干旱, 3-污染")
-    warning_level = Column(SmallInteger, nullable=False, comment="预警等级: 1-4")
+    warning_level = Column(SmallInteger, nullable=False, comment="预警等级: 1-蓝色, 2-黄色, 3-橙色, 4-红色")
     title = Column(String(200), nullable=False, comment="预警标题")
     content = Column(Text, comment="预警内容")
     affected_location = Column(String(200), comment="影响区域")
+    # 状态机: 1-已发布(published), 2-已确认(confirmed), 3-处理中(handling), 4-已解除(resolved), 0-已取消(cancelled)
+    status = Column(SmallInteger, default=1, comment="状态: 1-已发布, 2-已确认, 3-处理中, 4-已解除, 0-已取消")
+    confirmed_by = Column(String(50), comment="确认人")
+    confirmed_at = Column(DateTime, comment="确认时间")
+    handled_by = Column(String(50), comment="处理人")
+    handled_at = Column(DateTime, comment="处理时间")
+    resolved_by = Column(String(50), comment="解除人")
+    resolved_at = Column(DateTime, comment="解除时间")
     publish_time = Column(DateTime, nullable=False, comment="发布时间")
     expire_time = Column(DateTime, comment="过期时间")
-    status = Column(SmallInteger, default=1, comment="状态: 1-生效, 0-取消")
     created_by = Column(String(50), comment="创建人")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
@@ -113,6 +120,60 @@ class WarningInfo(Base):
         Index("idx_warning_type_level", "warning_type", "warning_level"),
         Index("idx_warning_publish_time", "publish_time"),
         Index("idx_warning_status", "status"),
+    )
+
+
+class BasinFeature(Base):
+    """流域特征表 —— basin_feature，存储各站点流域水文特征"""
+    __tablename__ = "basin_feature"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    location_id = Column(String(50), nullable=False, comment="站点ID")
+    timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
+    # 流域特征
+    drainage_area = Column(Float, comment="流域面积(km²)")
+    river_length = Column(Float, comment="河流长度(km)")
+    average_slope = Column(Float, comment="平均坡度(‰)")
+    soil_type = Column(String(50), comment="土壤类型")
+    vegetation_coverage = Column(Float, comment="植被覆盖率(%)")
+    # 聚合统计特征
+    avg_water_level_24h = Column(Float, comment="24小时平均水位(m)")
+    max_water_level_24h = Column(Float, comment="24小时最高水位(m)")
+    min_water_level_24h = Column(Float, comment="24小时最低水位(m)")
+    total_rainfall_24h = Column(Float, comment="24小时累计降雨量(mm)")
+    avg_rainfall_24h = Column(Float, comment="24小时平均降雨量(mm)")
+    water_level_trend = Column(Float, comment="水位变化趋势(m/h)")
+    # 洪水风险因子
+    flood_risk_index = Column(Float, comment="洪水风险指数(0-1)")
+    soil_saturation = Column(Float, comment="土壤饱和度估计(%)")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("idx_basin_location_time", "location_id", "timestamp"),
+        Index("idx_basin_risk", "flood_risk_index"),
+    )
+
+
+class ForecastResult(Base):
+    """预测结果表 —— forecast_result，存储每次预测的完整结果"""
+    __tablename__ = "forecast_result"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    location_id = Column(String(50), nullable=False, comment="站点ID")
+    predict_time = Column(DateTime, nullable=False, comment="预测发起时间")
+    forecast_horizon = Column(SmallInteger, default=24, comment="预测时长(小时)")
+    predicted_levels = Column(Text, comment="预测水位序列(JSON)")
+    max_predicted_level = Column(Float, comment="预测最高水位(m)")
+    risk_level = Column(SmallInteger, comment="风险等级: 0-4")
+    risk_name = Column(String(50), comment="风险名称")
+    confidence = Column(Float, comment="置信度(0-1)")
+    model_version = Column(String(50), comment="模型版本号")
+    input_summary = Column(Text, comment="输入数据摘要(JSON)")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("idx_forecast_location_time", "location_id", "predict_time"),
+        Index("idx_forecast_risk", "risk_level"),
     )
 
 

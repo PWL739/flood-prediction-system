@@ -1,6 +1,7 @@
 from src.db.models import (
     MonitorStation, WaterMonitoringData, WaterQualityData,
     FloodPredictionRecord, WarningInfo, ModelVersion,
+    BasinFeature, ForecastResult,
     RawWaterData, CleanedWaterData, FeatureData,
 )
 from src.db.init_db import (

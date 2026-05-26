@@ -19,7 +19,7 @@ class ModelTrainer:
             self.model.parameters(), lr=MODEL_CONFIG["learning_rate"]
         )
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode="min", factor=0.5, patience=10, verbose=True
+            self.optimizer, mode="min", factor=0.5, patience=10
         )
         self.train_losses = []
         self.val_losses = []

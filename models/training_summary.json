@@ -1,0 +1,42 @@
+[
+  {
+    "station_id": "S001",
+    "train_samples": 500,
+    "val_samples": 125,
+    "final_train_loss": 0.5547193353995681,
+    "final_val_loss": 0.046581520698964596,
+    "model_path": "models\\lstm_attention_S001.pt"
+  },
+  {
+    "station_id": "S002",
+    "train_samples": 500,
+    "val_samples": 125,
+    "final_train_loss": 1.0543344868347049,
+    "final_val_loss": 0.3678841255605221,
+    "model_path": "models\\lstm_attention_S002.pt"
+  },
+  {
+    "station_id": "S003",
+    "train_samples": 500,
+    "val_samples": 125,
+    "final_train_loss": 0.8118132902309299,
+    "final_val_loss": 0.08153983717784286,
+    "model_path": "models\\lstm_attention_S003.pt"
+  },
+  {
+    "station_id": "S004",
+    "train_samples": 500,
+    "val_samples": 125,
+    "final_train_loss": 0.6748231840319932,
+    "final_val_loss": 0.04767752648331225,
+    "model_path": "models\\lstm_attention_S004.pt"
+  },
+  {
+    "station_id": "S005",
+    "train_samples": 500,
+    "val_samples": 125,
+    "final_train_loss": 0.6484586680307984,
+    "final_val_loss": 0.05011157086119056,
+    "model_path": "models\\lstm_attention_S005.pt"
+  }
+]

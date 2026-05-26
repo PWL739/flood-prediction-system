@@ -378,6 +378,81 @@ async def get_active_warnings():
     return success_response(warnings)
 
 
+@router.get("/warning/list")
+async def get_warning_list(
+    status: Optional[int] = Query(None, description="状态过滤: 1-已发布, 2-已确认, 3-处理中, 4-已解除, 0-已取消"),
+):
+    """获取预警列表（Week 2 新增：支持按状态机状态过滤）"""
+    warnings = warning_service.get_warning_list(status_filter=status)
+    return success_response({
+        "total": len(warnings),
+        "warnings": warnings,
+        "status_names": {
+            0: "已取消", 1: "已发布", 2: "已确认",
+            3: "处理中", 4: "已解除",
+        },
+    })
+
+
+# ==================== 预警状态机 (Week 2 新增) ====================
+
+@router.post("/warnings/{warning_id}/confirm")
+async def confirm_warning(
+    warning_id: str,
+    confirmed_by: str = Query("system", description="确认人"),
+):
+    """确认预警: 已发布(1) → 已确认(2)"""
+    ok = warning_service.confirm_warning(warning_id, confirmed_by)
+    if not ok:
+        raise HTTPException(status_code=400, detail="预警不存在或状态不允许确认(需为'已发布')")
+    state = warning_service.get_warning_state(warning_id)
+    return success_response(state, message="预警已确认")
+
+
+@router.post("/warnings/{warning_id}/handle")
+async def handle_warning(
+    warning_id: str,
+    handled_by: str = Query("system", description="处理人"),
+):
+    """处理预警: 已确认(2) → 处理中(3)"""
+    ok = warning_service.handle_warning(warning_id, handled_by)
+    if not ok:
+        raise HTTPException(status_code=400, detail="预警不存在或状态不允许处理(需为'已确认')")
+    state = warning_service.get_warning_state(warning_id)
+    return success_response(state, message="预警处理中")
+
+
+@router.post("/warnings/{warning_id}/resolve")
+async def resolve_warning(
+    warning_id: str,
+    resolved_by: str = Query("system", description="解除人"),
+):
+    """解除预警: 处理中(3) → 已解除(4)"""
+    ok = warning_service.resolve_warning(warning_id, resolved_by)
+    if not ok:
+        raise HTTPException(status_code=400, detail="预警不存在或状态不允许解除(需为'已确认'或'处理中')")
+    state = warning_service.get_warning_state(warning_id)
+    return success_response(state, message="预警已解除")
+
+
+@router.post("/warnings/{warning_id}/escalate")
+async def escalate_warning(warning_id: str):
+    """升级预警: 提升一个等级"""
+    result = warning_service.escalate_warning(warning_id)
+    if not result:
+        raise HTTPException(status_code=400, detail="预警不存在或已是最高级别")
+    return success_response(result, message="预警已升级")
+
+
+@router.get("/warnings/{warning_id}/state")
+async def get_warning_state(warning_id: str):
+    """查询预警状态机当前状态"""
+    state = warning_service.get_warning_state(warning_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="预警不存在")
+    return success_response(state)
+
+
 @router.post("/warnings/{warning_id}/cancel")
 async def cancel_warning(warning_id: str):
     """取消预警"""

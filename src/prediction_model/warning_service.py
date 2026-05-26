@@ -108,6 +108,100 @@ class WarningService:
             return True
         return False
 
+    def confirm_warning(self, warning_id: str, confirmed_by: str = "system") -> bool:
+        """确认预警: 已发布(1) → 已确认(2)"""
+        if warning_id in self.current_warnings:
+            w = self.current_warnings[warning_id]
+            if w["status"] == 1:
+                w["status"] = 2
+                w["confirmed_by"] = confirmed_by
+                w["confirmed_at"] = datetime.now().isoformat()
+                return True
+        return False
+
+    def handle_warning(self, warning_id: str, handled_by: str = "system") -> bool:
+        """处理预警: 已确认(2) → 处理中(3)"""
+        if warning_id in self.current_warnings:
+            w = self.current_warnings[warning_id]
+            if w["status"] == 2:
+                w["status"] = 3
+                w["handled_by"] = handled_by
+                w["handled_at"] = datetime.now().isoformat()
+                return True
+        return False
+
+    def resolve_warning(self, warning_id: str, resolved_by: str = "system") -> bool:
+        """解除预警: 处理中(3) → 已解除(4)"""
+        if warning_id in self.current_warnings:
+            w = self.current_warnings[warning_id]
+            if w["status"] in (2, 3):
+                w["status"] = 4
+                w["resolved_by"] = resolved_by
+                w["resolved_at"] = datetime.now().isoformat()
+                return True
+        return False
+
+    def escalate_warning(self, warning_id: str) -> Optional[Dict]:
+        """预警升级: 提升一个预警等级（最高到4级红色）"""
+        if warning_id in self.current_warnings:
+            w = self.current_warnings[warning_id]
+            if w["warning_level"] < 4:
+                new_level = w["warning_level"] + 1
+                level_names = {1: "蓝色", 2: "黄色", 3: "橙色", 4: "红色"}
+                w["warning_level"] = new_level
+                w["title"] = w["title"].replace(
+                    level_names.get(new_level - 1, ""),
+                    level_names.get(new_level, ""),
+                )
+                return {
+                    "warning_id": warning_id,
+                    "old_level": new_level - 1,
+                    "new_level": new_level,
+                }
+        return None
+
+    def get_warning_state(self, warning_id: str) -> Optional[Dict]:
+        """获取预警当前状态"""
+        if warning_id in self.current_warnings:
+            w = self.current_warnings[warning_id]
+            status_names = {
+                0: "已取消", 1: "已发布", 2: "已确认",
+                3: "处理中", 4: "已解除",
+            }
+            return {
+                "warning_id": warning_id,
+                "status_code": w["status"],
+                "status_name": status_names.get(w["status"], "未知"),
+                "warning_level": w["warning_level"],
+                "title": w["title"],
+                "publish_time": w.get("publish_time"),
+                "confirmed_by": w.get("confirmed_by"),
+                "confirmed_at": w.get("confirmed_at"),
+                "handled_by": w.get("handled_by"),
+                "handled_at": w.get("handled_at"),
+                "resolved_by": w.get("resolved_by"),
+                "resolved_at": w.get("resolved_at"),
+            }
+        return None
+
+    def get_warning_list(self, status_filter: Optional[int] = None) -> List[Dict]:
+        """获取预警列表（支持按状态过滤）"""
+        warnings = []
+        for wid, w in self.current_warnings.items():
+            if status_filter is not None and w["status"] != status_filter:
+                continue
+            warnings.append({
+                "id": wid,
+                "title": w["title"],
+                "warning_type": w["warning_type"],
+                "warning_level": w["warning_level"],
+                "status": w["status"],
+                "affected_location": w.get("affected_location", ""),
+                "publish_time": w.get("publish_time", ""),
+                "expire_time": w.get("expire_time", ""),
+            })
+        return sorted(warnings, key=lambda x: x["publish_time"], reverse=True)
+
     def get_active_warnings(self) -> List[Dict]:
         """获取当前生效的预警"""
         now = datetime.now()
