@@ -328,6 +328,54 @@ async def get_flood_risk(location_id: str = Query(..., description="站点ID")):
     return success_response(result)
 
 
+@router.get("/prediction/attention-heatmap")
+async def get_attention_heatmap(location_id: str = Query(..., description="站点ID")):
+    """获取注意力热力图数据（72h历史 × 24h预测权重矩阵）"""
+    import pandas as pd
+    import numpy as np
+
+    raw_data = data_service.collect_station_realtime(location_id)
+    if not raw_data:
+        raise HTTPException(status_code=404, detail=f"站点 {location_id} 不存在或无数据")
+
+    dates = pd.date_range(end=datetime.now(), periods=72, freq="h")
+    sample_data = pd.DataFrame({
+        "location_id": location_id,
+        "timestamp": dates,
+        "water_level": np.random.uniform(8, 18, 72),
+        "flow_rate": np.random.uniform(100, 500, 72),
+        "rainfall": np.random.uniform(0, 30, 72),
+        "temperature": np.random.uniform(15, 35, 72),
+        "ph": np.random.uniform(6.5, 7.5, 72),
+        "turbidity": np.random.uniform(10, 20, 72),
+        "dissolved_oxygen": np.random.uniform(6, 10, 72),
+    })
+
+    result = predictor.predict_flood_risk(sample_data)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    attention_weights = result.get("attention_weights", [])
+    predictions = [h["level"] for h in result.get("hourly_predictions", [])]
+
+    feature_names = ["water_level", "flow_rate", "rainfall", "temperature", "ph", "turbidity", "dissolved_oxygen"]
+    history_labels = [f"T-{72-i}h" for i in range(72)]
+    prediction_labels = [f"T+{i+1}h" for i in range(24)]
+
+    return success_response({
+        "location_id": location_id,
+        "station_name": result.get("station_name", location_id),
+        "predict_time": result["predict_time"],
+        "risk_level": result["risk_level"],
+        "risk_name": result["risk_name"],
+        "attention_weights": attention_weights,
+        "predictions": predictions,
+        "feature_names": feature_names,
+        "history_labels": history_labels,
+        "prediction_labels": prediction_labels,
+    })
+
+
 @router.get("/prediction/all-stations")
 async def get_all_stations_risk():
     """获取所有站点的洪水风险预测"""

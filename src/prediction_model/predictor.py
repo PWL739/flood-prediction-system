@@ -29,6 +29,22 @@ class FloodPredictor:
         output = self.model(input_tensor)
         return output.numpy()
 
+    @torch.no_grad()
+    def predict_with_attention_weights(self, input_sequence: np.ndarray) -> dict:
+        """
+        执行预测并返回注意力权重
+        Args:
+            input_sequence: 输入序列 [batch, seq_len, features]
+        Returns:
+            {"prediction": np.ndarray, "attention_weights": np.ndarray}
+        """
+        input_tensor = torch.FloatTensor(input_sequence)
+        result = self.model.predict_with_attention(input_tensor)
+        return {
+            "prediction": result["prediction"].numpy(),
+            "attention_weights": result["attention_weights"].numpy(),
+        }
+
     def predict_flood_risk(
         self, recent_data: pd.DataFrame
     ) -> Dict:
@@ -53,9 +69,11 @@ class FloodPredictor:
         std[std == 0] = 1
         features_norm = (features - mean) / std
 
-        # 预测
+        # 预测（带注意力权重）
         input_seq = features_norm.reshape(1, seq_length, -1)
-        predictions = self.predict(input_seq)[0]
+        att_result = self.predict_with_attention_weights(input_seq)
+        predictions = att_result["prediction"][0]
+        attention_weights = att_result["attention_weights"][0].tolist()
 
         # 去归一化(简化处理)
         predicted_levels = predictions * std[0, 0] + mean[0, 0]
@@ -76,6 +94,7 @@ class FloodPredictor:
             "risk_level": risk_level["level"],
             "risk_name": risk_level["name"],
             "confidence": risk_level["confidence"],
+            "attention_weights": attention_weights,
         }
 
     def _assess_risk_level(self, water_level: float) -> Dict:
