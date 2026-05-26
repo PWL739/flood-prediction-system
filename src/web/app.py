@@ -11,8 +11,8 @@ from src.config.settings import API_CONFIG
 
 app = FastAPI(
     title="基于LSTM-Attention的洪水预测与预警系统",
-    description="智慧水利应用课程作业 —— 第3组 | Week 2 增强版",
-    version="2.0.0",
+    description="智慧水利应用课程作业 —— 第3组 | Week 3 增强版",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -34,9 +34,9 @@ async def root():
     """根路径，返回API概述"""
     return {
         "name": "基于LSTM-Attention的洪水预测与预警系统",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "group": "第3组",
-        "week": "Week 2",
+        "week": "Week 3",
         "endpoints": {
             "监测站点": {
                 "GET /api/v1/stations": "获取站点列表（支持过滤）",
@@ -54,13 +54,20 @@ async def root():
                 "POST /api/v1/data/process-batch": "批量数据处理",
             },
             "预测": {
-                "GET /api/v1/prediction/flood-risk": "洪水风险预测",
+                "GET /api/v1/prediction/flood-risk": "洪水风险预测（含注意力权重）",
                 "GET /api/v1/prediction/all-stations": "所有站点风险预测",
+                "GET /api/v1/prediction/attention-heatmap": "注意力热力图数据 (Week 3 新增)",
             },
             "预警管理": {
                 "POST /api/v1/warnings": "创建预警",
                 "GET /api/v1/warnings/active": "生效预警列表",
+                "GET /api/v1/warning/list": "预警列表（支持状态过滤）",
+                "POST /api/v1/warnings/{id}/confirm": "确认预警",
+                "POST /api/v1/warnings/{id}/handle": "处理预警",
+                "POST /api/v1/warnings/{id}/resolve": "解除预警",
+                "POST /api/v1/warnings/{id}/escalate": "升级预警",
                 "POST /api/v1/warnings/{id}/cancel": "取消预警",
+                "GET /api/v1/warnings/{id}/state": "查询预警状态",
             },
             "采集统计": {
                 "GET /api/v1/collection/stats": "数据采集统计",
@@ -75,7 +82,7 @@ async def health_check():
     from datetime import datetime
     return {
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "timestamp": datetime.now().isoformat(),
     }
 
