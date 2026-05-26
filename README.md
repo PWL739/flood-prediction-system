@@ -1,176 +1,219 @@
-# Flood Prediction and Early Warning System 洪水预测与预警系统
+# 基于 LSTM-Attention 的洪水预测与预警系统 Flood Prediction & Early Warning System
 
-Based on LSTM-Attention, predicts flood risk using 72-hour hydrological data to forecast water levels for the next 24 hours.
+利用 BiLSTM + Attention 机制，基于 5 个监测站点过去 72 小时水文数据，预测未来 24 小时水位变化，并实现四级洪水预警与状态机管理。
 
-基于LSTM-Attention的洪水预测与预警系统，利用过去72小时水文数据预测未来24小时水位变化。
+## 组别 Team
 
-## Team 组别
+**第 3 组** | 智慧水利应用课程
 
-**Group 3 / 第3组** | Course: Smart Water Resources Application / 智慧水利应用
+| 成员 | 角色 | 职责 |
+|------|------|------|
+| 庞雯乐 | 项目经理 | 需求分析、系统架构设计 |
+| 李杨芷慧 | AI 开发 | LSTM-Attention 模型开发与训练、API 开发 |
+| 陈心怡 | 前端与可视化 | Streamlit 仪表盘、数据可视化 |
 
-| Member 成员 | Role 角色 | Responsibilities 职责 |
-|------------|-----------|---------------------|
-| 庞雯乐 | TBD | TBD |
-| 李杨芷慧 | TBD | TBD |
-| 陈心怡 | TBD | TBD |
-
-## Architecture 系统架构
+## 系统架构 Architecture
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌──────────────┐    ┌──────────────┐
-│  Data       │───▶│  Data       │───▶│  LSTM-       │───▶│  Warning     │
-│  Collection │    │  Processing │    │  Attention   │    │  Service     │
-│  (Sensors)  │    │  (Validate) │    │  Model       │    │  (Alert)     │
-└─────────────┘    └─────────────┘    └──────────────┘    └──────────────┘
-       │                                                         │
-       └─────────────────────── RESTful API ─────────────────────┘
-                                      │
-                            FastAPI Web Server
+┌──────────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────┐
+│  传感器模拟   │───▶│  数据处理管道  │───▶│  LSTM-Attention│───▶│  预警状态机   │
+│  5站点×30天   │    │  校验/清洗/   │    │  训练 + 推理   │    │  发布→确认→  │
+│  水位/降雨/水质│    │  聚合/特征工程 │    │  5站点独立模型 │    │  处理→解除    │
+└──────────────┘    └──────────────┘    └───────────────┘    └──────────────┘
+       │                                                              │
+       └─────────────────── FastAPI + Streamlit ──────────────────────┘
+                           RESTful API / 可视化仪表盘
 ```
 
-## Project Structure 项目结构
+## 项目结构 Project Structure
 
 ```
 flood-prediction-system/
 ├── src/
-│   ├── config/settings.py        # System configuration
-│   ├── data_collection/          # Data collection module
-│   │   ├── sensor_simulator.py   #   Sensor simulation (water level, rainfall, quality)
-│   │   └── data_collector.py     #   Data collection service
-│   ├── data_processing/          # Data processing module
-│   │   ├── data_validator.py     #   Data validation & cleaning
-│   │   └── data_preprocessor.py  #   Data preprocessing (normalization, sequencing)
-│   ├── prediction_model/         # Prediction model module
-│   │   ├── lstm_attention.py     #   LSTM-Attention model definition
-│   │   ├── trainer.py            #   Model trainer
-│   │   ├── predictor.py          #   Prediction service
-│   │   └── warning_service.py    #   Warning service
-│   ├── db/                       # Database module
-│   │   ├── models.py             #   ORM models (8 tables)
-│   │   └── init_db.py            #   DB initialization
-│   └── web/                      # Web API module
-│       ├── app.py                #   FastAPI application
-│       └── routes.py             #   API route definitions
-├── tests/                        # Unit tests
+│   ├── config/settings.py            # 系统配置（站点、模型参数、阈值）
+│   ├── data_collection/              # 数据采集模块
+│   │   ├── sensor_simulator.py       #   传感器模拟器（水位/降雨/水质，Markov过程）
+│   │   └── data_collector.py         #   数据采集服务（5站点管理）
+│   ├── data_processing/              # 数据处理模块
+│   │   ├── data_validator.py         #   数据校验与清洗
+│   │   ├── data_preprocessor.py      #   预处理（归一化/标准化/滑动窗口）
+│   │   ├── data_aggregator.py        #   时序聚合与流域特征计算
+│   │   └── batch_processor.py        #   批量数据处理管道
+│   ├── prediction_model/             # 预测模型模块
+│   │   ├── lstm_attention.py         #   BiLSTM + Attention 模型定义
+│   │   ├── trainer.py                #   训练器（Early Stopping）
+│   │   ├── predictor.py              #   推理与洪水风险评估
+│   │   └── warning_service.py        #   预警服务 + 状态机
+│   ├── db/                           # 数据库模块
+│   │   ├── models.py                 #   ORM 模型（10 张表，含数据分层存储）
+│   │   ├── init_db.py                #   数据库初始化
+│   │   └── data_ingestion.py         #   数据入库管道
+│   ├── web/                          # Web API 模块
+│   │   ├── app.py                    #   FastAPI 应用入口
+│   │   ├── routes.py                 #   API 路由（18个端点）
+│   │   └── schemas.py                #   Pydantic 数据模型
+│   └── visualization/                # 可视化模块
+│       └── app.py                    #   Streamlit 仪表盘（7个页面）
+├── scripts/
+│   ├── run_pipeline.py               # 端到端流程演示
+│   ├── train_model.py                # 模型训练脚本（5站点 × 30天 × 24h）
+│   ├── run_api.sh                    # API 启动脚本
+│   └── run_streamlit.sh             # Streamlit 启动脚本
+├── models/                           # 已训练模型
+│   ├── lstm_attention_S001.pt        #   站点 S001 模型
+│   ├── lstm_attention_S002.pt        #   站点 S002 模型
+│   ├── lstm_attention_S003.pt        #   站点 S003 模型
+│   ├── lstm_attention_S004.pt        #   站点 S004 模型
+│   ├── lstm_attention_S005.pt        #   站点 S005 模型
+│   └── training_summary.json         #   训练结果汇总
+├── data/                             # 数据文件
+├── tests/                            # 单元测试
 │   ├── test_data_collection.py
 │   ├── test_data_processing.py
 │   └── test_prediction_model.py
-├── scripts/
-│   └── run_pipeline.py           # End-to-end pipeline demo
-├── docs/
-│   └── assignment_report.md      # Progress report
-├── ai_plan/
-│   └── ai_instructions.md        # AI programming records
+├── ai_plan/                          # AI 辅助编程记录
 ├── requirements.txt
 └── README.md
 ```
 
-## Modules 模块说明
+## 核心模块 Core Modules
 
-### 1. Data Collection 数据采集
+### 1. 传感器模拟 Data Collection
 
-| Class | Function | Description |
-|-------|----------|-------------|
-| `WaterLevelSensor` | `read_data()` | Simulates water level readings with diurnal cycle + noise |
-| `RainfallSensor` | `read_data()` | Simulates rainfall events with Markov process |
-| `WaterQualitySensor` | `read_data()` | Simulates pH, turbidity, dissolved oxygen |
-| `SensorDataCollector` | `collect_all_data()` | Manages 5 monitoring stations |
-| `DataCollectionService` | `collect_realtime_data()` | High-level collection interface |
+| 类 | 功能 |
+|----|------|
+| `WaterLevelSensor` | 模拟水位数据（日周期 + 噪声） |
+| `RainfallSensor` | 模拟降雨事件（Markov 过程） |
+| `WaterQualitySensor` | 模拟水质数据（pH、浊度、溶解氧） |
+| `SensorDataCollector` | 管理 5 个监测站点 |
+| `DataCollectionService` | 高层采集接口，含实时 + 批量采集 |
 
-### 2. Data Processing 数据处理
+### 2. 数据处理 Data Processing
 
-| Class | Function | Description |
-|-------|----------|-------------|
-| `DataValidator` | `validate_water_data()` | Range/logical/timestamp validation |
-| `DataValidator` | `batch_validate()` | Batch validation |
-| `DataPreprocessor` | `normalize_data()` | Min-Max normalization |
-| `DataPreprocessor` | `standardize_data()` | Z-score standardization |
-| `DataPreprocessor` | `create_sequences()` | Time series windowing |
-| `DataPreprocessor` | `prepare_training_data()` | Feature/label generation |
+- **DataValidator**: 范围校验 / 逻辑校验 / 时间戳校验，批量校验 + 质量评分
+- **DataPreprocessor**: Min-Max 归一化 / Z-score 标准化 / 滑动窗口（72→24）
+- **DataAggregator**: 24h 时序聚合统计 + 流域特征计算（坡度、植被覆盖率等）
+- **BatchDataProcessor**: 批量数据文件加载 + 完整处理管道（清洗→特征工程→数据集构建）
 
-### 3. LSTM-Attention Model 预测模型
+### 3. LSTM-Attention 预测模型
 
-| Class | Function | Description |
-|-------|----------|-------------|
-| `AttentionLayer` | `forward()` | Additive attention mechanism |
-| `LSTMAttentionModel` | `forward()` | BiLSTM + Attention + FC |
-| `ModelTrainer` | `fit()` | Training loop with early stopping |
-| `FloodPredictor` | `predict_flood_risk()` | Risk assessment & prediction |
+**算法流程**: BiLSTM 提取时序特征 → Attention 聚焦关键时间步 → 全连接层输出 24h 水位预测
 
-**Algorithm**: Bidirectional LSTM extracts temporal features → Attention layer focuses on critical time steps → Fully connected layer outputs 24-hour water level predictions.
+| 参数 | 值 |
+|------|-----|
+| input_size | 7（水位、流量、降雨、温度、pH、浊度、溶解氧） |
+| hidden_size | 128 |
+| num_layers | 2（双向） |
+| seq_length | 72 小时 |
+| output_size | 24 小时 |
+| batch_size | 16 |
+| epochs | 30（Early Stopping） |
 
-**Parameters**: input_size=7, hidden_size=128, num_layers=2, output_size=24, seq_length=72
+5 个站点独立训练，模型权重保存至 `models/` 目录。
 
-### 4. Warning Service 预警服务
+### 4. 预警状态机 Warning State Machine
 
-| Class | Function | Description |
-|-------|----------|-------------|
-| `WarningService` | `create_warning()` | Create warning (4 levels) |
-| `WarningService` | `send_warning()` | Multi-channel alert sending |
-| `WarningService` | `generate_flood_warning()` | Auto-generate from prediction |
+```
+已发布 (1) → 已确认 (2) → 处理中 (3) → 已解除 (4)
+    ↓                                     ↓
+  已取消 (0)                            已取消 (0)
+```
 
-Warning levels: Blue (1), Yellow (2), Orange (3), Red (4)
+四个预警等级：🔵 蓝色 → 🟡 黄色 → 🟠 橙色 → 🔴 红色
 
-### 5. Database 数据库
+支持预警升级（escalate）和取消（cancel）操作。
 
-8 tables with SQLAlchemy ORM:
+### 5. 数据库 Database
 
-- `monitor_station` - Station info
-- `water_monitoring_data` - Hydrological time-series
-- `water_quality_data` - Water quality data
-- `flood_prediction_record` - Prediction records
-- `warning_info` - Warning information
-- `model_version` - Model version management
+10 张表，含三层数据分层存储（原始→清洗→特征）：
+
+| 表名 | 说明 |
+|------|------|
+| `monitor_station` | 监测站点信息 |
+| `water_monitoring_data` | 水文监测时序数据 |
+| `water_quality_data` | 水质监测数据 |
+| `flood_prediction_record` | 预测记录 |
+| `warning_info` | 预警信息（含状态机字段） |
+| `basin_feature` | 流域水文特征（24h聚合统计） |
+| `forecast_result` | 完整预测结果 |
+| `model_version` | 模型版本管理 |
+| `raw_water_data` | 原始数据层（Tier 1） |
+| `cleaned_water_data` | 清洗数据层（Tier 2） |
+| `feature_data` | 特征数据层（Tier 3） |
 
 ### 6. Web API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/water-data/realtime` | GET | Real-time hydrological data |
-| `/api/v1/sensor-data` | POST | Submit sensor data |
-| `/api/v1/prediction/flood-risk` | GET | Flood risk prediction |
-| `/api/v1/warnings` | POST | Create warning |
-| `/api/v1/warnings/active` | GET | Active warnings list |
-| `/api/v1/stations` | GET | Station list |
+FastAPI 提供 18 个 RESTful 端点，统一 JSON 响应格式：
 
-## Quick Start 快速开始
+**站点管理**: `GET /api/v1/stations`
 
-### Requirements
+**实时数据**: `GET /api/v1/water-data/realtime` | `POST /api/v1/sensor-data`
+
+**历史数据**: `GET /api/v1/water-data/history` | `POST /api/v1/water-data/export`
+
+**批量处理**: `GET /api/v1/data-stats` | `POST /api/v1/data/process-batch`
+
+**预测**: `GET /api/v1/prediction/flood-risk` | `GET /api/v1/prediction/all-stations`
+
+**预警管理**: `POST /api/v1/warnings` | `GET /api/v1/warnings/active` | `GET /api/v1/warning/list`
+
+**状态机操作**: `POST /api/v1/warnings/{id}/confirm` | `/handle` | `/resolve` | `/escalate` | `/cancel` | `GET /api/v1/warnings/{id}/state`
+
+### 7. Streamlit 可视化仪表盘
+
+启动后访问 `http://localhost:8501`，提供 7 个功能页面：监测总览、实时数据、历史分析、预测图表、预警管理、模型性能、系统日志。
+
+## 快速开始 Quick Start
+
+### 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Run Pipeline Demo
+### 训练模型
 
 ```bash
 cd flood-prediction-system
-python scripts/run_pipeline.py
+python scripts/train_model.py
 ```
 
-### Start API Server
+### 启动 API 服务
 
 ```bash
 uvicorn src.web.app:app --reload
-# Visit http://localhost:8000/docs for Swagger UI
+# Swagger UI: http://localhost:8000/docs
 ```
 
-### Run Tests
+### 启动可视化仪表盘
+
+```bash
+streamlit run src/visualization/app.py --server.port 8501
+```
+
+### 运行端到端流程演示
+
+```bash
+python scripts/run_pipeline.py
+```
+
+### 运行测试
 
 ```bash
 pytest tests/ -v
 ```
 
-## Development Schedule 开发进度
+## 开发进度 Development Schedule
 
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Week 1: Architecture & Core Modules | 5.14 - 5.20 | ✅ Completed |
+| 阶段 | 时间 | 内容 | 状态 |
+|------|------|------|------|
+| Week 1 | 5.14 - 5.20 | 架构设计 + 传感器模拟 + 数据校验 + LSTM-Attention 模型 + API 基础 | ✅ 已完成 |
+| Week 2 | 5.21 - 5.27 | 数据预处理增强 + 时序存储优化 + API 增强 + 批量处理 + 模型训练脚本 + 数据库表补全 + 预警状态机 + Streamlit 仪表盘 | ✅ 已完成 |
 
-## AI-Assisted Programming
+## AI 辅助编程 AI-Assisted Programming
 
-This project follows AI-assisted programming standard workflow. See [ai_plan/](ai_plan/) for detailed AI instruction records.
+本项目遵循 AI 辅助编程标准流程，详见 [ai_plan/](ai_plan/)。
 
 ## License
 
-Course project for educational purposes.
+课程项目，仅供教学使用。
