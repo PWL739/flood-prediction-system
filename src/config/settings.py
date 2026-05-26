@@ -42,10 +42,25 @@ MONITOR_STATIONS = [
 # 数据库配置
 DATABASE_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
-    "port": int(os.getenv("DB_PORT", "3306")),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
+    "port": int(os.getenv("DB_PORT", "5432")),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "postgres"),
     "database": os.getenv("DB_NAME", "flood_prediction"),
+}
+
+# TimescaleDB配置
+TIMESCALEDB_CONFIG = {
+    "hypertable_chunk_interval": "1 day",
+    "compression_enabled": True,
+    "compression_after_days": 7,
+    "retention_days": 365,
+}
+
+# 数据分层存储配置
+DATA_TIER_CONFIG = {
+    "raw": {"table_suffix": "raw", "retention_days": 90},
+    "cleaned": {"table_suffix": "cleaned", "retention_days": 365},
+    "feature": {"table_suffix": "feature", "retention_days": 730},
 }
 
 # Redis配置

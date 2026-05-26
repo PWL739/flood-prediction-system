@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from sqlalchemy import (
-    Column, BigInteger, String, DateTime, Decimal,
+    Column, BigInteger, String, DateTime, Numeric,
     Text, SmallInteger, Float, create_engine, Index
 )
 from sqlalchemy.orm import declarative_base
@@ -16,8 +16,8 @@ class MonitorStation(Base):
 
     id = Column(String(50), primary_key=True, comment="站点ID")
     name = Column(String(100), nullable=False, comment="站点名称")
-    latitude = Column(Decimal(10, 6), comment="纬度")
-    longitude = Column(Decimal(10, 6), comment="经度")
+    latitude = Column(Numeric(10, 6), comment="纬度")
+    longitude = Column(Numeric(10, 6), comment="经度")
     river_system = Column(String(100), comment="所属水系")
     status = Column(SmallInteger, default=1, comment="状态: 1-正常, 0-停用")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
@@ -35,10 +35,10 @@ class WaterMonitoringData(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     location_id = Column(String(50), nullable=False, comment="站点ID")
     timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
-    water_level = Column(Decimal(8, 2), comment="水位(m)")
-    flow_rate = Column(Decimal(10, 2), comment="流量(m³/s)")
-    rainfall = Column(Decimal(6, 2), comment="降雨量(mm)")
-    temperature = Column(Decimal(5, 2), comment="温度(°C)")
+    water_level = Column(Numeric(8, 2), comment="水位(m)")
+    flow_rate = Column(Numeric(10, 2), comment="流量(m³/s)")
+    rainfall = Column(Numeric(6, 2), comment="降雨量(mm)")
+    temperature = Column(Numeric(5, 2), comment="温度(°C)")
     data_quality = Column(SmallInteger, default=1, comment="数据质量: 1-正常, 2-异常, 3-缺失")
     status = Column(SmallInteger, default=1, comment="记录状态")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
@@ -58,11 +58,11 @@ class WaterQualityData(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     location_id = Column(String(50), nullable=False, comment="站点ID")
     timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
-    ph_value = Column(Decimal(3, 2), comment="pH值")
-    turbidity = Column(Decimal(6, 2), comment="浊度(NTU)")
-    dissolved_oxygen = Column(Decimal(5, 2), comment="溶解氧(mg/L)")
-    ammonia_nitrogen = Column(Decimal(6, 3), comment="氨氮(mg/L)")
-    chemical_oxygen_demand = Column(Decimal(6, 2), comment="化学需氧量(mg/L)")
+    ph_value = Column(Numeric(3, 2), comment="pH值")
+    turbidity = Column(Numeric(6, 2), comment="浊度(NTU)")
+    dissolved_oxygen = Column(Numeric(5, 2), comment="溶解氧(mg/L)")
+    ammonia_nitrogen = Column(Numeric(6, 3), comment="氨氮(mg/L)")
+    chemical_oxygen_demand = Column(Numeric(6, 2), comment="化学需氧量(mg/L)")
     water_quality_level = Column(SmallInteger, comment="水质等级: 1-5类")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
@@ -80,8 +80,8 @@ class FloodPredictionRecord(Base):
     location_id = Column(String(50), nullable=False, comment="站点ID")
     predict_time = Column(DateTime, nullable=False, comment="预测时间")
     predict_hour = Column(SmallInteger, comment="预测未来第N小时")
-    predicted_water_level = Column(Decimal(8, 2), comment="预测水位(m)")
-    confidence_score = Column(Decimal(5, 4), comment="置信度")
+    predicted_water_level = Column(Numeric(8, 2), comment="预测水位(m)")
+    confidence_score = Column(Numeric(5, 4), comment="置信度")
     risk_level = Column(SmallInteger, comment="风险等级: 1-4")
     model_version = Column(String(50), comment="模型版本号")
     input_data_summary = Column(Text, comment="输入数据摘要(JSON)")
@@ -123,7 +123,7 @@ class ModelVersion(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     version = Column(String(50), nullable=False, comment="版本号")
     description = Column(Text, comment="版本描述")
-    accuracy = Column(Decimal(5, 4), comment="准确率")
+    accuracy = Column(Numeric(5, 4), comment="准确率")
     parameters_summary = Column(Text, comment="参数摘要(JSON)")
     training_data_range = Column(String(200), comment="训练数据时间范围")
     status = Column(SmallInteger, default=1, comment="状态: 1-已部署, 0-未部署")
@@ -134,4 +134,82 @@ class ModelVersion(Base):
     __table_args__ = (
         Index("idx_model_version", "version"),
         Index("idx_model_status", "status"),
+    )
+
+
+# ==================== 数据分层存储模型 ====================
+
+class RawWaterData(Base):
+    """原始水文数据表（Tier 1: 原始数据层）"""
+    __tablename__ = "raw_water_data"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    location_id = Column(String(50), nullable=False, comment="站点ID")
+    timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
+    water_level = Column(Numeric(8, 2), comment="水位(m)")
+    flow_rate = Column(Numeric(10, 2), comment="流量(m³/s)")
+    rainfall = Column(Numeric(6, 2), comment="降雨量(mm)")
+    temperature = Column(Numeric(5, 2), comment="温度(°C)")
+    ph_value = Column(Numeric(3, 2), comment="pH值")
+    turbidity = Column(Numeric(6, 2), comment="浊度(NTU)")
+    dissolved_oxygen = Column(Numeric(5, 2), comment="溶解氧(mg/L)")
+    data_quality = Column(SmallInteger, default=1, comment="数据质量: 1-正常, 2-异常, 3-缺失")
+    raw_json = Column(Text, comment="原始JSON数据")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("idx_raw_location_time", "location_id", "timestamp"),
+        Index("idx_raw_timestamp", "timestamp"),
+    )
+
+
+class CleanedWaterData(Base):
+    """清洗后水文数据表（Tier 2: 清洗数据层）"""
+    __tablename__ = "cleaned_water_data"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    location_id = Column(String(50), nullable=False, comment="站点ID")
+    timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
+    water_level = Column(Float, comment="水位(m)")
+    flow_rate = Column(Float, comment="流量(m³/s)")
+    rainfall = Column(Float, comment="降雨量(mm)")
+    temperature = Column(Float, comment="温度(°C)")
+    ph_value = Column(Float, comment="pH值")
+    turbidity = Column(Float, comment="浊度(NTU)")
+    dissolved_oxygen = Column(Float, comment="溶解氧(mg/L)")
+    quality_score = Column(Float, default=1.0, comment="质量评分 0-1")
+    validation_passed = Column(SmallInteger, default=1, comment="验证通过: 1-通过, 0-未通过")
+    source_id = Column(BigInteger, comment="原始数据ID")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("idx_cleaned_location_time", "location_id", "timestamp"),
+        Index("idx_cleaned_quality", "quality_score"),
+    )
+
+
+class FeatureData(Base):
+    """特征工程数据表（Tier 3: 特征数据层）"""
+    __tablename__ = "feature_data"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    location_id = Column(String(50), nullable=False, comment="站点ID")
+    timestamp = Column(DateTime, nullable=False, comment="数据时间戳")
+    water_level = Column(Float, comment="水位")
+    # 滚动统计特征
+    wl_rolling_mean_6h = Column(Float, comment="6小时滚动均值")
+    wl_rolling_std_6h = Column(Float, comment="6小时滚动标准差")
+    wl_diff_1h = Column(Float, comment="1小时水位变化")
+    rf_cumsum_6h = Column(Float, comment="6小时累计降雨")
+    # 时间特征
+    hour = Column(SmallInteger, comment="小时(0-23)")
+    day_of_week = Column(SmallInteger, comment="星期(0-6)")
+    month = Column(SmallInteger, comment="月份(1-12)")
+    # 标签
+    target_water_level_24h = Column(Float, comment="24小时后水位(标签)")
+    source_id = Column(BigInteger, comment="清洗数据ID")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("idx_feature_location_time", "location_id", "timestamp"),
     )
