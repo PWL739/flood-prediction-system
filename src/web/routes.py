@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Request, Depends
 from fastapi.responses import JSONResponse
 
 from src.data_collection.data_collector import DataCollectionService
@@ -14,12 +14,19 @@ from src.web.schemas import (
     WarningCreate,
 )
 
+from src.auth.dependencies import get_current_user, require_auth, require_role, CurrentUser
+from src.auth.jwt_handler import JWTHandler
+from src.auth.role_manager import RoleManager
+from src.config.settings import JWT_CONFIG
+from src.data_collection.csv_importer import CsvImporter
+
 router = APIRouter(prefix="/api/v1")
 
 # 服务实例
 data_service = DataCollectionService()
 predictor = FloodPredictor()
 warning_service = WarningService()
+csv_importer = CsvImporter()
 
 
 # ==================== 统一响应工具 ====================
@@ -38,6 +45,214 @@ def error_response(code: int, message: str, detail: str = None) -> JSONResponse:
             "detail": detail,
         },
     )
+
+
+# ==================== 认证相关 ====================
+
+@router.post("/auth/login")
+async def login(request: Request):
+    """用户登录"""
+    from src.db.models import User
+    from src.db.init_db import get_session
+
+    body = await request.json()
+    username = body.get("username", "")
+    password = body.get("password", "")
+
+    session = get_session()
+    try:
+        user = session.query(User).filter(
+            User.username == username,
+            User.is_active == 1,
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail={"code": 401, "message": "用户名或密码错误", "data": None},
+            )
+
+        try:
+            from passlib.hash import bcrypt as passlib_bcrypt
+            password_valid = passlib_bcrypt.verify(password, user.password_hash)
+        except Exception:
+            import hashlib
+            password_valid = (user.password_hash == hashlib.sha256(password.encode()).hexdigest())
+
+        if not password_valid:
+            raise HTTPException(
+                status_code=401,
+                detail={"code": 401, "message": "用户名或密码错误", "data": None},
+            )
+
+        token = JWTHandler.create_access_token({
+            "sub": user.username,
+            "role": user.role,
+        })
+
+        return success_response({
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": JWT_CONFIG["access_token_expire_minutes"] * 60,
+            "user": {
+                "username": user.username,
+                "role": user.role,
+                "display_name": user.display_name,
+            },
+        }, message="登录成功")
+    finally:
+        session.close()
+
+
+@router.get("/auth/me")
+async def get_current_user_info(user: CurrentUser = Depends(require_auth())):
+    """获取当前登录用户信息"""
+    return success_response({
+        "username": user.username,
+        "role": user.role,
+        "is_authenticated": user.is_authenticated,
+    })
+
+
+# ==================== 用户管理 ====================
+
+@router.post("/users")
+async def create_user(
+    request: Request,
+    current_user: CurrentUser = Depends(require_role("manage_users")),
+):
+    """创建新用户（管理员）"""
+    from src.db.models import User
+    from src.db.init_db import get_session
+    from passlib.hash import bcrypt
+
+    body = await request.json()
+    username = body.get("username", "")
+    password = body.get("password", "")
+    role = body.get("role", "")
+    display_name = body.get("display_name", username)
+
+    valid_roles = {"admin", "commander", "researcher", "grassroots"}
+    if role not in valid_roles:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": 400, "message": f"无效角色: {role}", "data": None},
+        )
+
+    session = get_session()
+    try:
+        existing = session.query(User).filter(User.username == username).first()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": 400, "message": f"用户名 '{username}' 已存在", "data": None},
+            )
+
+        new_user = User(
+            username=username,
+            password_hash=bcrypt.hash(password),
+            role=role,
+            display_name=display_name,
+            is_active=1,
+        )
+        session.add(new_user)
+        session.commit()
+
+        return success_response({
+            "id": new_user.id,
+            "username": new_user.username,
+            "role": new_user.role,
+            "display_name": new_user.display_name,
+        }, message="用户创建成功")
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail={"code": 500, "message": f"创建失败: {e}", "data": None},
+        )
+    finally:
+        session.close()
+
+
+@router.get("/users")
+async def list_users(
+    current_user: CurrentUser = Depends(require_role("manage_users")),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """用户列表（管理员）"""
+    from src.db.models import User
+    from src.db.init_db import get_session
+
+    session = get_session()
+    try:
+        total = session.query(User).count()
+        users = session.query(User).order_by(User.id).offset(offset).limit(limit).all()
+        return success_response({
+            "total": total,
+            "users": [
+                {
+                    "id": u.id,
+                    "username": u.username,
+                    "role": u.role,
+                    "display_name": u.display_name,
+                    "is_active": u.is_active,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
+                }
+                for u in users
+            ],
+        })
+    finally:
+        session.close()
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: CurrentUser = Depends(require_role("manage_users")),
+):
+    """删除用户-软删除（管理员）"""
+    from src.db.models import User
+    from src.db.init_db import get_session
+
+    session = get_session()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail={"code": 404, "message": "用户不存在", "data": None})
+        user.is_active = 0
+        session.commit()
+        return success_response(None, message=f"用户 '{user.username}' 已删除")
+    finally:
+        session.close()
+
+
+@router.put("/users/{user_id}/password")
+async def reset_password(
+    user_id: int,
+    request: Request,
+    current_user: CurrentUser = Depends(require_role("manage_users")),
+):
+    """重置密码（管理员）"""
+    from src.db.models import User
+    from src.db.init_db import get_session
+    from passlib.hash import bcrypt
+
+    body = await request.json()
+    new_password = body.get("new_password", "")
+
+    session = get_session()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail={"code": 404, "message": "用户不存在", "data": None})
+        user.password_hash = bcrypt.hash(new_password)
+        session.commit()
+        return success_response(None, message=f"用户 '{user.username}' 密码已重置")
+    finally:
+        session.close()
 
 
 # ==================== 监测站点 ====================
@@ -84,7 +299,10 @@ async def get_realtime_data(
 
 
 @router.post("/sensor-data")
-async def submit_sensor_data(data: SensorDataSubmit):
+async def submit_sensor_data(
+    data: SensorDataSubmit,
+    current_user: CurrentUser = Depends(require_role("submit_data")),
+):
     """提交传感器数据（带Pydantic校验）"""
     import pandas as pd
     import numpy as np
@@ -105,6 +323,10 @@ async def submit_sensor_data(data: SensorDataSubmit):
     validation_results = validator.batch_validate(formatted)
     valid_count = sum(1 for r in validation_results if r["is_valid"])
     quality_avg = sum(r["quality_score"] for r in validation_results) / max(len(validation_results), 1)
+
+    # 清除对应站点的预测缓存
+    for reading in data.readings:
+        predictor.invalidate_station_cache(reading.station_id)
 
     return success_response({
         "status": "received",
@@ -162,7 +384,10 @@ async def get_historical_data(
 
 
 @router.post("/water-data/export")
-async def export_historical_data(query: HistoricalDataExport):
+async def export_historical_data(
+    query: HistoricalDataExport,
+    current_user: CurrentUser = Depends(require_role("export")),
+):
     """导出历史数据（JSON/CSV）"""
     from src.config.settings import DATA_DIR
     import json as json_module
@@ -241,7 +466,10 @@ async def get_data_statistics():
 # ==================== 批量数据处理 ====================
 
 @router.post("/data/process-batch")
-async def process_batch_data(filepath: str = Query(..., description="数据文件路径")):
+async def process_batch_data(
+    filepath: str = Query(..., description="数据文件路径"),
+    current_user: CurrentUser = Depends(require_role("batch_process")),
+):
     """批量处理历史数据（清洗+特征工程+数据集构建）"""
     from pathlib import Path
     from src.data_processing.batch_processor import BatchDataProcessor
@@ -406,7 +634,10 @@ async def get_all_stations_risk():
 # ==================== 预警管理 ====================
 
 @router.post("/warnings")
-async def create_warning(warning_data: WarningCreate):
+async def create_warning(
+    warning_data: WarningCreate,
+    current_user: CurrentUser = Depends(require_role("create_warning")),
+):
     """创建预警信息（Pydantic校验）"""
     warning = warning_service.create_warning(
         warning_type=warning_data.warning_type,
@@ -448,6 +679,7 @@ async def get_warning_list(
 async def confirm_warning(
     warning_id: str,
     confirmed_by: str = Query("system", description="确认人"),
+    current_user: CurrentUser = Depends(require_role("manage_warning")),
 ):
     """确认预警: 已发布(1) → 已确认(2)"""
     ok = warning_service.confirm_warning(warning_id, confirmed_by)
@@ -461,6 +693,7 @@ async def confirm_warning(
 async def handle_warning(
     warning_id: str,
     handled_by: str = Query("system", description="处理人"),
+    current_user: CurrentUser = Depends(require_role("manage_warning")),
 ):
     """处理预警: 已确认(2) → 处理中(3)"""
     ok = warning_service.handle_warning(warning_id, handled_by)
@@ -474,6 +707,7 @@ async def handle_warning(
 async def resolve_warning(
     warning_id: str,
     resolved_by: str = Query("system", description="解除人"),
+    current_user: CurrentUser = Depends(require_role("manage_warning")),
 ):
     """解除预警: 处理中(3) → 已解除(4)"""
     ok = warning_service.resolve_warning(warning_id, resolved_by)
@@ -484,7 +718,10 @@ async def resolve_warning(
 
 
 @router.post("/warnings/{warning_id}/escalate")
-async def escalate_warning(warning_id: str):
+async def escalate_warning(
+    warning_id: str,
+    current_user: CurrentUser = Depends(require_role("manage_warning")),
+):
     """升级预警: 提升一个等级"""
     result = warning_service.escalate_warning(warning_id)
     if not result:
@@ -502,7 +739,10 @@ async def get_warning_state(warning_id: str):
 
 
 @router.post("/warnings/{warning_id}/cancel")
-async def cancel_warning(warning_id: str):
+async def cancel_warning(
+    warning_id: str,
+    current_user: CurrentUser = Depends(require_role("manage_warning")),
+):
     """取消预警"""
     success = warning_service.cancel_warning(warning_id)
     if not success:
@@ -517,3 +757,114 @@ async def get_collection_stats():
     """获取数据采集统计"""
     stats = data_service.get_collection_stats()
     return success_response(stats)
+
+
+# ==================== CSV 数据导入 ====================
+
+@router.post("/data/import-csv")
+async def import_csv_data(
+    request: Request,
+    current_user: CurrentUser = Depends(require_role("batch_process")),
+):
+    """导入 CSV 水文数据"""
+    from pathlib import Path as _Path
+
+    body = await request.json()
+    filepath = body.get("filepath", "")
+    mapping = body.get("mapping", {})
+
+    if not _Path(filepath).exists():
+        raise HTTPException(status_code=404, detail={"code": 404, "message": f"文件不存在: {filepath}", "data": None})
+
+    result = csv_importer.import_and_clean(filepath, mapping)
+
+    if result["status"] == "error":
+        raise HTTPException(
+            status_code=400,
+            detail={"code": 400, "message": result.get("message", "导入失败"), "data": result},
+        )
+
+    return success_response(result, message="导入完成")
+
+
+@router.get("/data/import-templates")
+async def get_import_templates(
+    current_user: CurrentUser = Depends(require_auth()),
+):
+    """获取 CSV 映射模板列表（需登录）"""
+    templates = csv_importer.list_templates()
+    return success_response(templates)
+
+
+@router.post("/data/import-templates")
+async def save_import_template(
+    request: Request,
+    current_user: CurrentUser = Depends(require_role("batch_process")),
+):
+    """保存 CSV 映射模板"""
+    body = await request.json()
+    filepath = csv_importer.save_template(body)
+    return success_response({"filepath": filepath}, message="模板保存成功")
+
+
+@router.get("/data/import-history")
+async def get_import_history(
+    current_user: CurrentUser = Depends(require_role("batch_process")),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """获取导入历史"""
+    history = csv_importer.get_import_history(limit)
+    return success_response(history)
+
+
+@router.get("/data/csv-sniff")
+async def sniff_csv(
+    filepath: str = Query(..., description="CSV 文件路径"),
+    current_user: CurrentUser = Depends(require_role("batch_process")),
+):
+    """自动检测 CSV 格式"""
+    from pathlib import Path as _Path
+    if not _Path(filepath).exists():
+        raise HTTPException(status_code=404, detail={"code": 404, "message": f"文件不存在: {filepath}", "data": None})
+    result = csv_importer.sniff(filepath)
+    return success_response(result)
+
+
+# ==================== 操作日志查询 ====================
+
+@router.get("/logs")
+async def get_operation_logs(
+    request: Request,
+    user_id: Optional[str] = Query(None),
+    method: Optional[str] = Query(None),
+    path: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    current_user: CurrentUser = Depends(require_role("view_logs")),
+):
+    """查询操作日志（管理员/指挥）"""
+    if hasattr(request.app.state, "log_middleware"):
+        logs = request.app.state.log_middleware.get_all_buffered_logs()
+    else:
+        return success_response({"total": 0, "logs": []})
+
+    # 过滤
+    if user_id:
+        logs = [l for l in logs if l.get("user_id") == user_id]
+    if method:
+        logs = [l for l in logs if l.get("method", "").upper() == method.upper()]
+    if path:
+        logs = [l for l in logs if path in l.get("path", "")]
+
+    total = len(logs)
+    logs = sorted(logs, key=lambda x: str(x.get("timestamp", "")), reverse=True)
+    paged = logs[offset: offset + limit]
+
+    serialized = []
+    for log in paged:
+        entry = dict(log)
+        if hasattr(entry.get("timestamp"), "isoformat"):
+            entry["timestamp"] = entry["timestamp"].isoformat()
+        serialized.append(entry)
+
+    return success_response({"total": total, "logs": serialized})

@@ -156,3 +156,71 @@ class DataStatsResponse(BaseModel):
     raw: Dict
     cleaned: Dict
     feature: Dict
+
+
+# ==================== 认证相关模型 ====================
+
+class LoginRequest(BaseModel):
+    """登录请求"""
+    username: str = Field(..., min_length=1, max_length=50, description="用户名")
+    password: str = Field(..., min_length=1, max_length=100, description="密码")
+
+
+class LoginResponse(BaseModel):
+    """登录响应"""
+    access_token: str = Field(..., description="JWT 访问令牌")
+    token_type: str = Field(default="bearer", description="令牌类型")
+    expires_in: int = Field(default=7200, description="过期时间(秒)")
+    user: dict = Field(default_factory=dict, description="用户信息")
+
+
+class UserCreate(BaseModel):
+    """创建用户请求"""
+    username: str = Field(..., min_length=2, max_length=50, description="登录用户名")
+    password: str = Field(..., min_length=6, max_length=100, description="密码")
+    role: str = Field(..., description="角色: admin/commander/researcher/grassroots")
+    display_name: Optional[str] = Field(default=None, max_length=100, description="显示名称")
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        valid_roles = {"admin", "commander", "researcher", "grassroots"}
+        if v not in valid_roles:
+            raise ValueError(f"无效角色: {v}，有效值为: {valid_roles}")
+        return v
+
+
+class UserResponse(BaseModel):
+    """用户信息响应"""
+    id: int
+    username: str
+    role: str
+    display_name: Optional[str] = None
+    is_active: int
+    created_at: str
+
+
+class PasswordReset(BaseModel):
+    """密码重置请求"""
+    new_password: str = Field(..., min_length=6, max_length=100, description="新密码")
+
+
+# ==================== CSV 导入相关模型 ====================
+
+class CsvMappingConfig(BaseModel):
+    """CSV 列映射配置"""
+    template_name: str = Field(..., min_length=1, description="模板名称")
+    description: Optional[str] = Field(default="", description="模板描述")
+    column_mapping: dict = Field(..., description="列名映射: 标准字段 -> CSV列名")
+    datetime_format: Optional[str] = Field(default=None, description="时间格式")
+    skip_rows: int = Field(default=0, ge=0, description="跳过的行数")
+    encoding: str = Field(default="utf-8", description="文件编码")
+    delimiter: str = Field(default=",", description="分隔符")
+    unit_conversions: Optional[dict] = Field(default_factory=dict, description="单位转换")
+    station_id_mapping: Optional[dict] = Field(default_factory=dict, description="站点ID映射")
+
+
+class CsvImportRequest(BaseModel):
+    """CSV 导入请求"""
+    filepath: str = Field(..., min_length=1, description="CSV 文件路径")
+    mapping: CsvMappingConfig = Field(..., description="列映射配置")
