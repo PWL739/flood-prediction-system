@@ -282,7 +282,7 @@ class User(Base):
     """用户表 —— 支持四类角色"""
     __tablename__ = "user"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False, comment="登录用户名")
     password_hash = Column(String(128), nullable=False, comment="bcrypt 密码哈希")
     role = Column(String(20), nullable=False, comment="角色: admin/commander/researcher/grassroots")

@@ -1,5 +1,7 @@
 """数据库初始化模块 —— PostgreSQL + TimescaleDB 支持"""
 
+import os
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from src.db.models import Base, RawWaterData, CleanedWaterData, FeatureData
@@ -154,3 +156,18 @@ def create_dev_engine(db_path: str = "flood_prediction.db"):
     """创建SQLite开发环境引擎（无需安装PostgreSQL）"""
     engine = create_engine(get_sqlite_url(db_path), echo=False)
     return engine
+
+
+# ==================== 便捷会话管理 ====================
+
+_dev_session_factory = None
+
+def get_session():
+    """获取数据库会话（开发环境使用 SQLite 单例）"""
+    global _dev_session_factory
+    if _dev_session_factory is None:
+        db_url = os.getenv("DATABASE_URL", "sqlite:///flood_prediction.db")
+        engine = create_engine(db_url, echo=False)
+        Base.metadata.create_all(engine)
+        _dev_session_factory = sessionmaker(bind=engine)
+    return _dev_session_factory()
