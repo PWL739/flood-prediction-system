@@ -3,7 +3,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, BigInteger, String, DateTime, Numeric,
-    Text, SmallInteger, Float, create_engine, Index
+    Text, SmallInteger, Float, Integer, Index
 )
 from sqlalchemy.orm import declarative_base
 
@@ -310,7 +310,7 @@ class OperationLog(Base):
     method = Column(String(10), nullable=False, comment="HTTP 方法")
     path = Column(String(200), nullable=False, comment="请求路径")
     status_code = Column(SmallInteger, comment="响应状态码")
-    duration_ms = Column(SmallInteger, comment="处理耗时(毫秒)")
+    duration_ms = Column(Integer, comment="处理耗时(毫秒)")
     ip_address = Column(String(45), comment="客户端IP")
     user_agent = Column(String(500), comment="User-Agent")
     request_summary = Column(String(200), comment="操作摘要")

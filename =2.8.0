@@ -1,0 +1,11 @@
+Looking in indexes: https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+Collecting pyjwt
+  Downloading https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/79/84/0fdf9b18ba31d69877bd39c9cd6052b47f3761e9910c15de788e519f079f/PyJWT-2.9.0-py3-none-any.whl (22 kB)
+Collecting passlib[bcrypt]>=1.7.4
+  Downloading https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl (525 kB)
+     ------------------------------------ 525.6/525.6 kB 333.1 kB/s eta 0:00:00
+Collecting bcrypt>=3.1.0
+  Downloading https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/41/aa/4190e60921927b7056820291f56fc57d00d04757c8b316b2d3c0d1d6da2c/bcrypt-5.0.0-cp38-abi3-win_amd64.whl (150 kB)
+     -------------------------------------- 150.9/150.9 kB 9.4 MB/s eta 0:00:00
+Installing collected packages: passlib, pyjwt, bcrypt
+Successfully installed bcrypt-5.0.0 passlib-1.7.4 pyjwt-2.9.0

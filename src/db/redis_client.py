@@ -6,6 +6,8 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+from src.config.settings import REDIS_CONFIG
+
 try:
     import redis
     REDIS_AVAILABLE = True
@@ -31,7 +33,6 @@ class RedisClient:
         if not REDIS_AVAILABLE:
             return
         try:
-            from src.config.settings import REDIS_CONFIG
             self._client = redis.Redis(
                 host=REDIS_CONFIG["host"],
                 port=REDIS_CONFIG["port"],
@@ -53,7 +54,7 @@ class RedisClient:
         return self._available and self._client is not None
 
     @property
-    def client(self):
+    def client(self) -> Optional["redis.Redis"]:
         """返回原始 redis 客户端，不可用时返回 None"""
         return self._client if self.available else None
 
@@ -72,7 +73,7 @@ class RedisClient:
         if not self.available:
             return False
         try:
-            if ttl:
+            if ttl is not None:
                 self._client.setex(key, ttl, value)
             else:
                 self._client.set(key, value)
@@ -115,6 +116,12 @@ class RedisClient:
         except Exception as e:
             logger.warning("Redis LPUSH 失败: %s", e)
             return False
+
+    def reconnect(self) -> bool:
+        """重新连接 Redis，用于从瞬断中恢复"""
+        self._available = False
+        self._init_client()
+        return self._available
 
     def health_check(self) -> bool:
         """健康检查"""
