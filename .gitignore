@@ -25,6 +25,9 @@ Thumbs.db
 checkpoints/
 logs/
 
+# Database
+*.db
+
 # Reports
 *.docx
 
